@@ -1,0 +1,70 @@
+/// <reference lib="webworker" />
+// Runs Python (Pyodide) off the main thread so a slow or endless program never
+// freezes the page. The page can always kill this worker and start a new one.
+import type { PyodideAPI } from "pyodide";
+import type { FromWorker, ToWorker } from "./protocol";
+
+const post = (msg: FromWorker) => self.postMessage(msg);
+
+let pyodide: PyodideAPI | undefined;
+let currentId = 0;
+
+async function init(indexURL: string, packageBaseUrl: string) {
+  // Loaded at runtime from our own site rather than bundled by Vite.
+  const { loadPyodide } = await import(/* @vite-ignore */ `${indexURL}pyodide.mjs`);
+  pyodide = (await loadPyodide({ indexURL, packageBaseUrl })) as PyodideAPI;
+  pyodide.setStdout({ batched: (text) => post({ type: "stdout", id: currentId, text: text + "\n" }) });
+  pyodide.setStderr({ batched: (text) => post({ type: "stderr", id: currentId, text: text + "\n" }) });
+  const pythonVersion = pyodide.runPython("import sys; sys.version.split()[0]") as string;
+  post({ type: "ready", pythonVersion });
+}
+
+async function run(id: number, code: string) {
+  currentId = id;
+  // A fresh namespace per run, so one attempt never leaks into the next.
+  const globals = pyodide!.globals.get("dict")();
+  try {
+    await pyodide!.runPythonAsync(code, { globals, filename: "main.py" });
+    post({ type: "done", id, ok: true });
+  } catch (err) {
+    post({ type: "stderr", id, text: cleanTraceback(String((err as Error).message ?? err)) });
+    post({ type: "done", id, ok: false });
+  } finally {
+    globals.destroy();
+  }
+}
+
+async function install(id: number, packages: string[]) {
+  currentId = id;
+  try {
+    await pyodide!.loadPackage("micropip");
+    const micropip = pyodide!.pyimport("micropip");
+    await micropip.install(packages);
+    micropip.destroy();
+    post({ type: "done", id, ok: true });
+  } catch (err) {
+    post({ type: "stderr", id, text: String((err as Error).message ?? err) });
+    post({ type: "done", id, ok: false });
+  }
+}
+
+// Drop Pyodide's internal frames so learners only see their own code.
+function cleanTraceback(message: string): string {
+  const lines = message.split("\n");
+  const start = lines.findIndex((line) => line.includes('File "main.py"'));
+  if (start <= 0) return message;
+  return ["Traceback (most recent call last):", ...lines.slice(start)].join("\n");
+}
+
+self.onmessage = (event: MessageEvent<ToWorker>) => {
+  const msg = event.data;
+  if (msg.type === "init") {
+    init(msg.indexURL, msg.packageBaseUrl).catch((err) =>
+      post({ type: "init-error", message: String(err?.message ?? err) }),
+    );
+  } else if (msg.type === "run") {
+    void run(msg.id, msg.code);
+  } else if (msg.type === "install") {
+    void install(msg.id, msg.packages);
+  }
+};
