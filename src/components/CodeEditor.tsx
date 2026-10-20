@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { EditorView, basicSetup } from "codemirror";
 import { keymap } from "@codemirror/view";
+import { Prec } from "@codemirror/state";
 import { indentWithTab } from "@codemirror/commands";
 import { python } from "@codemirror/lang-python";
 import { oneDark } from "@codemirror/theme-one-dark";
@@ -38,7 +39,7 @@ export function CodeEditor({ value, onChange, onRun, label }: Props) {
         basicSetup,
         python(),
         oneDark,
-        theme,
+        Prec.highest(theme),
         keymap.of([
           { key: "Mod-Enter", run: () => (callbacks.current.onRun?.(), true) },
           indentWithTab,

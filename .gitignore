@@ -4,3 +4,4 @@ public/pyodide
 test-results
 playwright-report
 *.tsbuildinfo
+__pycache__/

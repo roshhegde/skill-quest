@@ -1,0 +1,26 @@
+id: py-r1-m1
+track: python
+region: 1
+regionName: First steps
+order: 1
+title: Opening Day
+format: Write it
+minutes: 5
+xp: 10
+story: |
+  Café Byte opens its doors today. The owner wants a welcome sign printed by a script, so it can change when the café grows.
+goal: "Print exactly: Welcome to Café Byte! We open at 8."
+concept:
+  title: Variables and f-strings
+  body: |
+    A variable is a name that points at a value: `cafe_name = "Café Byte"`.
+    Put an `f` before a string and anything inside `{ }` is replaced by its value.
+  snippet: |
+    city = "Lisbon"
+    rooms = 12
+    print(f"Hotel {city} has {rooms} rooms.")
+hints:
+  - Strings go in quotes, whole numbers don't.
+  - Set cafe_name to "Café Byte" and opening_hour to 8.
+  - "Try: print(f\"Welcome to {cafe_name}! We open at {opening_hour}.\")"
+recap: Variables name values, and f-strings drop them into text.

@@ -1,4 +1,5 @@
-import type { FromWorker, ToWorker } from "./protocol";
+import type { CheckResult, FromWorker, ToWorker } from "./protocol";
+import harness from "./labcheck.py?raw";
 
 export const PYODIDE_VERSION = "314.0.7";
 const PACKAGE_CDN = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
@@ -11,6 +12,8 @@ export type RunResult = {
   timedOut: boolean;
   /** The run was killed by stop(). */
   stopped: boolean;
+  /** Lab runs only: one result per hidden check (missing if the run was killed). */
+  checks?: CheckResult[];
 };
 
 export type RunnerStatus =
@@ -22,6 +25,7 @@ type Pending = {
   id: number;
   stdout: string;
   stderr: string;
+  checks?: CheckResult[];
   onOutput?: (text: string, stream: "stdout" | "stderr") => void;
   resolve: (result: RunResult) => void;
   timer?: ReturnType<typeof setTimeout>;
@@ -44,6 +48,11 @@ export class PythonRunner {
 
   run(code: string, opts: { timeoutMs?: number; onOutput?: Pending["onOutput"] } = {}): Promise<RunResult> {
     return this.send({ type: "run", id: this.nextId++, code }, opts.timeoutMs ?? 5000, opts.onOutput);
+  }
+
+  /** Runs the learner's code, then the mission's checks.py against it. */
+  lab(code: string, checks: string, opts: { timeoutMs?: number; onOutput?: Pending["onOutput"] } = {}): Promise<RunResult> {
+    return this.send({ type: "lab", id: this.nextId++, code, checks }, opts.timeoutMs ?? 5000, opts.onOutput);
   }
 
   install(packages: string[], onOutput?: Pending["onOutput"]): Promise<RunResult> {
@@ -80,7 +89,7 @@ export class PythonRunner {
     });
     this.ready.catch(() => {});
     const indexURL = new URL("pyodide/", document.baseURI).href;
-    this.post({ type: "init", indexURL, packageBaseUrl: PACKAGE_CDN });
+    this.post({ type: "init", indexURL, packageBaseUrl: PACKAGE_CDN, harness });
   }
 
   private async send(msg: ToWorker & { id: number }, timeoutMs: number, onOutput?: Pending["onOutput"]) {
@@ -100,8 +109,10 @@ export class PythonRunner {
     if (msg.type === "stdout" || msg.type === "stderr") {
       p[msg.type] += msg.text;
       p.onOutput?.(msg.text, msg.type);
+    } else if (msg.type === "checks") {
+      p.checks = msg.results;
     } else if (msg.type === "done") {
-      this.finish({ ok: msg.ok, stdout: p.stdout, stderr: p.stderr, timedOut: false, stopped: false });
+      this.finish({ ok: msg.ok, stdout: p.stdout, stderr: p.stderr, checks: p.checks, timedOut: false, stopped: false });
     }
   }
 
