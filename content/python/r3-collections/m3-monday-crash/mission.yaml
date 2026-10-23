@@ -1,0 +1,28 @@
+id: py-r3-m3
+track: python
+region: 3
+regionName: Collections
+order: 3
+title: The Monday Crash
+format: Fix it
+minutes: 7
+xp: 10
+story: |
+  Café Byte's order script crashes every Monday, and the owner is losing sales.
+  Mondays are when the seasonal special, pumpkin spice, goes on sale, but nobody added it to the menu.
+goal: Make the script survive unknown items, list them, and print a Monday total of 47.50.
+concept:
+  title: Missing keys
+  body: |
+    A dictionary is a row of labelled drawers. Asking for a drawer that doesn't exist, like `menu["tea"]`, raises a KeyError.
+    `menu.get("tea")` returns `None` instead, and `menu.get("tea", 0)` returns `0`.
+  snippet: |
+    menu = {"latte": 3.5}
+    print(menu.get("tea"))
+    print(menu.get("tea", 0))
+    print(menu["tea"])
+hints:
+  - What happens when an item isn't on the menu?
+  - Look at how line 10 reads the price.
+  - Use price = menu.get(item). If it is None, add the item to missing and skip it with continue.
+recap: Use .get() when a key might be missing.
